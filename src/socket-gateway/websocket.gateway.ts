@@ -1,38 +1,45 @@
-import { OnGatewayDisconnect, SubscribeMessage, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
+import {
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  SubscribeMessage,
+  WebSocketGateway,
+  WebSocketServer,
+} from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
 import { createErrorResp, createOkResp, SocketResp } from './socket-resp';
 import { GuessInfo, PlayerInfo, Room } from './room';
 
 @WebSocketGateway()
-export class WebsocketGateway implements OnGatewayDisconnect {
+export class WebsocketGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnection<Socket> {
 
   @WebSocketServer()
   private server: Server;
 
   private rooms: Map<string, Room> = new Map();
   private usersConnected: { [id: string]: Room } = {};
+  private socketUserMap = new Map<string, string>();
 
   @SubscribeMessage('create-room')
-  createRoom(client: Socket, name: string) {
-    console.log('create-room', client.id);
+  createRoom(client: Socket, {id, payload: name}: {id: string, payload: string}) {
+    console.log('create-room', id);
     const roomId = Math.random() + '';
     const room = new Room(roomId);
-    room.addPlayer(client.id, name);
+    room.addPlayer(id, name);
     client.join(roomId);
-    this.usersConnected[client.id] = room;
+    this.usersConnected[id] = room;
     this.rooms.set(roomId, room);
     return new SocketResp(true, roomId);
   }
 
   @SubscribeMessage('join-room')
-  join(client: Socket, { roomId: roomIdToJoin, name }: { roomId: string, name: string }) {
-    console.log('join-room', client.id, roomIdToJoin);
+  join(client: Socket, {id, payload: { roomId: roomIdToJoin, name }}: {id: string, payload: { roomId: string, name: string }}) {
+    console.log('join-room', id, roomIdToJoin);
     const room = this.rooms.get(roomIdToJoin);
     if (room) {
-      if (!room.isPresent(client.id)) {
-        const player = room.addPlayer(client.id, name);
+      if (!room.isPresent(id)) {
+        const player = room.addPlayer(id, name);
         client.join(room.id);
-        this.usersConnected[client.id] = room;
+        this.usersConnected[id] = room;
         this.server.to(room.id).emit('player-join', createOkResp(player));
       }
       return createOkResp(room);
@@ -42,13 +49,13 @@ export class WebsocketGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('leave-room')
-  leaveRoom(client: Socket) {
-    console.log('leave-room', client.id);
-    const room = this.usersConnected[client.id];
+  leaveRoom(client: Socket, {id}) {
+    console.log('leave-room', id);
+    const room = this.usersConnected[id];
     if (room) {
-      this.usersConnected[client.id] = undefined;
+      this.usersConnected[id] = undefined;
       const master = room.master;
-      const player = room.removePlayer(client.id);
+      const player = room.removePlayer(id);
       const resp: { player: PlayerInfo, master?: string } = {
         player,
       };
@@ -69,15 +76,15 @@ export class WebsocketGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('init-game')
-  initGame(client: Socket) {
-    const room = this.usersConnected[client.id];
+  initGame(client: Socket, {id}) {
+    const room = this.usersConnected[id];
     room.updateNextTurn();
     this.server.to(room.id).emit('go-to-start', createOkResp(room));
   }
 
   @SubscribeMessage('get-state')
-  getState(client: Socket) {
-    const room = this.usersConnected[client.id];
+  getState(client: Socket, {id}) {
+    const room = this.usersConnected[id];
     if (room) {
       return createOkResp(room);
     } else {
@@ -86,18 +93,18 @@ export class WebsocketGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('set-word')
-  setWord(client: Socket, word: string) {
-    console.log('set-word', client.id, word);
-    const room = this.usersConnected[client.id];
+  setWord(client: Socket, {id, payload: word}: {id: string, payload: string}) {
+    console.log('set-word', id, word);
+    const room = this.usersConnected[id];
     room.setWord(word);
     this.server.to(room.id).emit('set-word', createOkResp(room.currentWord));
     this.server.to(room.id).emit('new-turn', createOkResp(room.updateNextTurn()));
   }
 
   @SubscribeMessage('new-guess')
-  newGuess(client: Socket, guessKey: string) {
-    console.log('new-guess', client.id, guessKey);
-    const room = this.usersConnected[client.id];
+  newGuess(client: Socket, {id, payload: guessKey}: {id: string, payload: string}) {
+    console.log('new-guess', id, guessKey);
+    const room = this.usersConnected[id];
     const guessInfo = room.addGuess(guessKey);
 
     this.server.to(room.id).emit('new-guess', createOkResp(guessInfo));
@@ -107,18 +114,18 @@ export class WebsocketGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('new-word-guess')
-  newWordGuess(client: Socket, word: string) {
+  newWordGuess(client: Socket, {id, payload: word}: {id: string, payload: string}) {
     console.log('new-word-guess', word);
-    const room = this.usersConnected[client.id];
-    room.checkWordGuess(client.id, word);
+    const room = this.usersConnected[id];
+    room.checkWordGuess(id, word);
     if(!this.checkGameFinished(room)) {
       this.server.to(room.id).emit('new-word-guesses', createOkResp(room.wordGuesses))
     }
   }
 
   @SubscribeMessage('restart-game')
-  restartGame(client: Socket) {
-    const room = this.usersConnected[client.id];
+  restartGame(client: Socket, {id}) {
+    const room = this.usersConnected[id];
     room.resetGame();
     this.server.to(room.id).emit('restart-game', createOkResp(room));
   }
@@ -141,7 +148,11 @@ export class WebsocketGateway implements OnGatewayDisconnect {
     }
   }
 
+  handleConnection(client: Socket): any {
+    this.socketUserMap.set(client.id, client.handshake.query.id);
+  }
+
   handleDisconnect(client: Socket): any {
-    this.leaveRoom(client);
+    this.leaveRoom(client, {id: this.socketUserMap.get(client.id)});
   }
 }
