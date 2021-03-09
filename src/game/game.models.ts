@@ -1,7 +1,9 @@
 import { generateRoomId } from '../utils/generate-random-id';
 
-// name of the winner, 'lose' if the game ended losing it, null if the game is active
-export type Status = string | 'lose' | null;
+export interface Status {
+  player: PlayerInfo;
+  win: boolean;
+}
 
 export interface LetterInfo {
   id: string;
@@ -13,6 +15,13 @@ export interface PlayerInfo {
   id: string;
   name: string;
   points: number;
+}
+
+export interface PlayerRemoved {
+  player: PlayerInfo;
+  roomId: string;
+  round: number;
+  wasMaster: boolean;
 }
 
 export interface GuessInfo {
@@ -52,7 +61,6 @@ export interface RoomDto {
   master: string; // The id of the player that is the game master
   currentTurn: string; // The id of the player whose has the current turn
   players: PlayerInfo[];
-  removedPlayers: Map<string, PlayerInfo>;
 }
 
 export interface PlayerLeaving {
@@ -70,7 +78,7 @@ export class RoomEntity implements RoomDto{
   master: string;
   currentTurn: string;
   players: PlayerInfo[];
-  removedPlayers: Map<string, PlayerInfo>;
+  round: number;
 
   constructor(
     masterId: string,
@@ -79,10 +87,11 @@ export class RoomEntity implements RoomDto{
     this.id = generateRoomId();
     this.master = null;
     this.players = [];
-    this.removedPlayers = new Map();
+    this.round = 0;
     this.resetGame();
-    this.addPlayer(masterId, masterName);
+    this.addPlayer(masterId, masterName, 0);
     this.master = masterId;
+    this.currentTurn = masterId;
   }
 
   private resetGame() {
@@ -92,6 +101,7 @@ export class RoomEntity implements RoomDto{
     this.status = null;
     this.errors = 0;
     this.currentTurn = null;
+    this.round += 1;
   }
 
   restartGame() {
@@ -112,20 +122,13 @@ export class RoomEntity implements RoomDto{
     return !!this.players.find(p => p.id === userId);
   }
 
-  addPlayer(userId: string, name: string): PlayerInfo {
+  addPlayer(userId: string, name: string, points: number): PlayerInfo {
     let player: PlayerInfo;
-    const returningPlayer = this.removedPlayers.get(userId);
-    if (returningPlayer) {
-      player = returningPlayer;
-      this.removedPlayers.delete(userId);
+    // TODO is it possible to add an already present player?
+    player = this.players.find(p => p.id === userId);
+    if (!player) {
+      player = { id: userId, name, points };
       this.players.push(player);
-    } else {
-      // TODO is it possible to add an already present player?
-      player = this.players.find(p => p.id === userId);
-      if (!player) {
-        player = { id: userId, name, points: 0 };
-        this.players.push(player);
-      }
     }
     return player;
   }
@@ -135,17 +138,20 @@ export class RoomEntity implements RoomDto{
 
     this.players = this.players.filter(p => p.id !== userId);
 
-    this.removedPlayers.set(player.id, player);
-
     this.updateMaster();
 
     return player;
   }
 
-  updateMaster() {
+  updateMaster(newMaster?: string) {
     if (!this.players.length) {
       // The room should be removed
       this.master = undefined;
+      return;
+    }
+
+    if (newMaster) {
+      this.master = newMaster;
       return;
     }
 
@@ -170,6 +176,7 @@ export class RoomEntity implements RoomDto{
     const nextTurnIndex = (currTurnIndex + 1) % this.players.length;
     const newCurrentTurn = this.players[nextTurnIndex].id;
     if (newCurrentTurn === this.master) {
+      this.currentTurn = this.master;
       this.currentTurn = this.updateNextTurn();
     } else {
       this.currentTurn = newCurrentTurn;
@@ -207,36 +214,34 @@ export class RoomEntity implements RoomDto{
   }
 
   isGameFinished() {
-    if (this.status) {
-      return this.status;
+    if (!this.status) {
+      if (this.currentWord.every(l => l.isGuessed)) {
+        this.finishGame(this.currentTurn, { win: true });
+      }
+
+      if (this.errors > 5) {
+        this.finishGame(this.master, { win: false });
+      }
     }
-
-    if (this.currentWord.every(l => l.isGuessed)) {
-      this.status = this.currentTurn;
-
-      const winnerPlayer = this.players.find(p => p.id === this.currentTurn);
-      winnerPlayer.points += 1;
-    }
-
-    if (this.errors > 5) {
-      this.status = 'lose';
-
-      const masterPlayer = this.players.find( p => p.id === this.master);
-      masterPlayer.points += 1;
-    }
-
     return this.status;
   }
 
+  private finishGame(playerId: string, { win }: { win: boolean}) {
+    const finishPlayer = this.players.find(p => p.id === playerId);
+    finishPlayer.points += 1;
+    this.status = {
+      player: finishPlayer,
+      win
+    };
+  }
+
   checkWordGuess(userId: string, word: string) {
-    // TODO check this method: should the status really be updated here?
     const normalizedWord = word.toUpperCase();
     this.wordGuesses.push(normalizedWord);
 
     const currentWord = this.currentWord.map(l => l.letter || ' ').join('');
     if (normalizedWord === currentWord) {
-      this.status = userId;
-      this.players.find(p => p.id === this.status).points += 1;
+      this.finishGame(userId, { win: true });
     }
   }
 }
@@ -251,7 +256,6 @@ export function roomEntityToDto(room: RoomEntity): RoomDto {
     errors: room.errors,
     master: room.master,
     currentTurn: room.currentTurn,
-    players: room.players,
-    removedPlayers: room.removedPlayers
+    players: room.players
   };
 }
