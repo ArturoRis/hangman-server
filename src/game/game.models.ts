@@ -29,6 +29,11 @@ export interface GuessInfo {
   ids: string[]; // if present are the id of the LetterInfo of which this letter is the answer
 }
 
+export interface SocketMessage<D> {
+  id: string;
+  payload: D;
+}
+
 export class SocketResp<R = string> {
   constructor(
       public ok: boolean,
@@ -46,15 +51,22 @@ export interface WordGuessDto {
   word: string;
 }
 
+export interface WordToGuessDto {
+  word: string;
+}
+
+export interface GuessDto {
+  letter: string;
+}
+
 export interface UserDto {
-  id: string;
   name: string;
 }
 
 export interface RoomDto {
   id: string;
   currentWord: LetterInfo[];
-  guesses: string[];
+  guesses: GuessInfo[];
   wordGuesses: string[];
   status: Status;
   errors: number;
@@ -71,7 +83,7 @@ export interface PlayerLeaving {
 export class RoomEntity implements RoomDto{
   id: string;
   currentWord: LetterInfo[];
-  guesses: string[];
+  guesses: GuessInfo[];
   wordGuesses: string[];
   status: Status;
   errors: number;
@@ -197,8 +209,9 @@ export class RoomEntity implements RoomDto{
   }
 
   addGuess(guess: string): GuessInfo {
-    this.guesses.push(guess);
-
+    if (this.guesses.find( g => g.letter === guess)) {
+      throw new Error('Letter already guessed');
+    }
     // Get all letters equals to the guess
     const presentLetterInfos = this.currentWord.filter(l => l.letter === guess);
     if (!presentLetterInfos || !presentLetterInfos.length) {
@@ -207,10 +220,13 @@ export class RoomEntity implements RoomDto{
       presentLetterInfos.forEach(l => l.isGuessed = true);
     }
 
-    return {
+    const guessInfo = {
       letter: guess,
       ids: presentLetterInfos.map(l => l.id),
     };
+    this.guesses.push(guessInfo);
+
+    return guessInfo;
   }
 
   isGameFinished() {

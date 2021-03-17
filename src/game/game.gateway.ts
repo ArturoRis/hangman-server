@@ -1,4 +1,5 @@
 import {
+  MessageBody,
   OnGatewayConnection,
   OnGatewayDisconnect,
   SubscribeMessage,
@@ -6,7 +7,16 @@ import {
   WebSocketServer
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { createOkResp, GuessInfo, LetterInfo, PlayerInfo, PlayerLeaving, Status } from './game.models';
+import {
+  createOkResp,
+  GuessInfo,
+  LetterInfo,
+  PlayerInfo,
+  PlayerLeaving, RoomDto,
+  RoomEntity,
+  SocketMessage,
+  Status
+} from './game.models';
 import { GameService } from './game.service';
 
 @WebSocketGateway()
@@ -15,13 +25,22 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
   @WebSocketServer()
   private server: Server;
   private userIdToClientMap: Map<string, Socket> = new Map();
+  private socketUserMap = new Map<string, string>();
 
   constructor(
     private gameService: GameService
   ) {
   }
 
-  private socketUserMap = new Map<string, string>();
+  restartGame(room: RoomDto) {
+    console.log('restart-game', room);
+    this.server.to(room.id).emit('restart-game', createOkResp(room));
+  }
+
+  initGame(room: RoomDto) {
+    console.log('init-game', room);
+    this.server.to(room.id).emit('go-to-start', createOkResp(room));
+  }
 
   join(roomIdToJoin: string, player: PlayerInfo) {
     console.log('join-room', player);
@@ -37,14 +56,6 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
   newTurn(roomId: string, playerInTurn: string) {
     console.log('newTurn-room', roomId, playerInTurn);
     this.server.to(roomId).emit('new-turn', createOkResp(playerInTurn));
-  }
-
-  @SubscribeMessage('init-game')
-  initGame(client: Socket, {id}) {
-    console.log('init-game', id);
-    const room = this.gameService.getRoomByPlayerId(id);
-    // room.updateNextTurn();
-    this.server.to(room.id).emit('go-to-start', createOkResp(room));
   }
 
   setWord(roomId: string, word: LetterInfo[]) {
@@ -74,14 +85,6 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
   updatePlayer(roomId: string, player: PlayerInfo) {
     console.log('update-player', roomId, player);
     this.server.to(roomId).emit('update-player', createOkResp(player));
-  }
-
-  @SubscribeMessage('restart-game')
-  restartGame(client: Socket, {id}) {
-    console.log('restart-game', id);
-    const room = this.gameService.getRoomByPlayerId(id);
-    room.restartGame();
-    this.server.to(room.id).emit('restart-game', createOkResp(room));
   }
 
   handleConnection(client: Socket): any {
