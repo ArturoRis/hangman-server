@@ -12,8 +12,9 @@ export class GameService {
 
   createRoom(userId: string, userName: string): RoomEntity {
     if (this.userToRoomMap.has(userId)) {
-      throw new ConflictException('Room already present', 'desc');
+      return this.getRoomByPlayerId(userId);
     }
+
     const room = new RoomEntity(userId, userName);
     this.roomsMap.set(room.id, room);
     this.userToRoomMap.set(userId, room);

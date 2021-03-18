@@ -1,22 +1,6 @@
-import {
-  MessageBody,
-  OnGatewayConnection,
-  OnGatewayDisconnect,
-  SubscribeMessage,
-  WebSocketGateway,
-  WebSocketServer
-} from '@nestjs/websockets';
+import { OnGatewayConnection, OnGatewayDisconnect, WebSocketGateway, WebSocketServer } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import {
-  createOkResp,
-  GuessInfo,
-  LetterInfo,
-  PlayerInfo,
-  PlayerLeaving, RoomDto,
-  RoomEntity,
-  SocketMessage,
-  Status
-} from './game.models';
+import { createOkResp, GuessInfo, LetterInfo, PlayerInfo, PlayerLeaving, RoomDto, Status } from './game.models';
 import { GameService } from './game.service';
 
 @WebSocketGateway()

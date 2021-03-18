@@ -1,16 +1,4 @@
-import {
-  BadRequestException,
-  Body,
-  Controller,
-  createParamDecorator,
-  Delete,
-  ExecutionContext,
-  Get,
-  Logger,
-  Param,
-  Post,
-  Put
-} from '@nestjs/common';
+import { BadRequestException, Body, Controller, Delete, Get, Logger, Param, Post, Put } from '@nestjs/common';
 import { GameService } from './game.service';
 import {
   GuessDto,
@@ -111,18 +99,18 @@ export class GameController {
   newGuess(@Param('roomId') roomId: string, @Body() {letter: char}: GuessDto): GuessInfo {
     this.logger.log('controller-new-guess ' + roomId + ', ' + char);
     const room = this.gameService.getRoomById(roomId);
-    try {
-      const guessInfo = room.addGuess(char);
-      if (!this.checkGameFinished(room)) {
-        this.gameGateway.newGuess(roomId, guessInfo);
-        this.gameGateway.newTurn(room.id, room.updateNextTurn());
-      }
 
-      return guessInfo;
-
-    } catch (e) {
+    if (room.checkGuessIsPresent(char)) {
       throw new BadRequestException(`Letter "${char}" already guessed`)
     }
+
+    const guessInfo = room.addGuess(char);
+    if (!this.checkGameFinished(room)) {
+      this.gameGateway.newGuess(roomId, guessInfo);
+      this.gameGateway.newTurn(room.id, room.updateNextTurn());
+    }
+
+    return guessInfo;
   }
 
   private checkGameFinished(room: RoomEntity): boolean {

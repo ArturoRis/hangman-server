@@ -208,10 +208,12 @@ export class RoomEntity implements RoomDto{
       }));
   }
 
+  checkGuessIsPresent(guess: string): boolean {
+    return !!this.guesses.find(g => g.letter === guess);
+  }
+
+
   addGuess(guess: string): GuessInfo {
-    if (this.guesses.find( g => g.letter === guess)) {
-      throw new Error('Letter already guessed');
-    }
     // Get all letters equals to the guess
     const presentLetterInfos = this.currentWord.filter(l => l.letter === guess);
     if (!presentLetterInfos || !presentLetterInfos.length) {
