@@ -105,8 +105,8 @@ export class GameController {
     }
 
     const guessInfo = room.addGuess(char);
+    this.gameGateway.newGuess(roomId, guessInfo);
     if (!this.checkGameFinished(room)) {
-      this.gameGateway.newGuess(roomId, guessInfo);
       this.gameGateway.newTurn(room.id, room.updateNextTurn());
     }
 
