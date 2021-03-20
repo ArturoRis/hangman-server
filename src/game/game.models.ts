@@ -47,7 +47,6 @@ export function createOkResp<R>(data: R) {
 }
 
 export interface WordGuessDto {
-  playerId: string;
   word: string;
 }
 

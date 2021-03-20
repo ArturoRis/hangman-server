@@ -130,10 +130,14 @@ export class GameController {
   }
 
   @Post('rooms/:roomId/word-guesses')
-  newWordGuess(@Param('roomId') roomId: string, @Body() wordGuess: WordGuessDto): WordGuessDto {
+  newWordGuess(
+    @Param('roomId') roomId: string,
+    @Body() wordGuess: WordGuessDto,
+    @PlayerIdHeader() userId: string
+  ): WordGuessDto {
     this.logger.log('controller-word-guess ' + roomId + ', ' + wordGuess.word);
     const room = this.gameService.getRoomById(roomId);
-    room.checkWordGuess(wordGuess.playerId, wordGuess.word)
+    room.checkWordGuess(userId, wordGuess.word)
     if (!this.checkGameFinished(room)) {
       this.gameGateway.newWordGuess(roomId, wordGuess.word);
     }
