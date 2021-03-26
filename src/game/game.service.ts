@@ -92,4 +92,8 @@ export class GameService {
   updateMaster(roomId: string, newMaster: string) {
     this.getRoomById(roomId).updateMaster(newMaster);
   }
+
+  isPlayerMaster(roomId: string, playerId: string) {
+    return this.getRoomById(roomId).master === playerId;
+  }
 }

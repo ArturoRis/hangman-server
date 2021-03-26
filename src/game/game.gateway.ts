@@ -21,11 +21,6 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
     this.server.to(room.id).emit('restart-game', createOkResp(room));
   }
 
-  initGame(room: RoomDto) {
-    console.log('init-game', room);
-    this.server.to(room.id).emit('go-to-start', createOkResp(room));
-  }
-
   join(roomIdToJoin: string, player: PlayerInfo) {
     console.log('join-room', player);
     this.userIdToClientMap.get(player.id).join(roomIdToJoin);
@@ -34,6 +29,7 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
 
   leaveRoom(roomId: string, playerLeaving: PlayerLeaving) {
     console.log('leave-room', roomId, playerLeaving.player.id);
+    this.userIdToClientMap.get(playerLeaving.player.id)?.leave(roomId);
     this.server.to(roomId).emit('player-leave', createOkResp(playerLeaving));
   }
 

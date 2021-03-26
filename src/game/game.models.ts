@@ -202,7 +202,7 @@ export class RoomEntity implements RoomDto{
       .split('')
       .map( (char, i) => ({
         letter: char === ' ' ? undefined : char,
-        isGuessed: false,
+        isGuessed: char === ' ',
         id: i.toString()
       }));
   }

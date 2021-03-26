@@ -12,7 +12,7 @@ import {
   WordToGuessDto
 } from './game.models';
 import { GameGateway } from './game.gateway';
-import { IsPlayerInTurnGuard, PlayerIdHeader } from './player-in-turn.guard';
+import { IsPlayerInTurnGuard, IsPlayerMasterGuard, PlayerIdHeader } from './player-in-turn.guard';
 
 @Controller('game')
 export class GameController {
@@ -39,23 +39,13 @@ export class GameController {
   }
 
   @Put('rooms/:roomId/restart-game')
-  @IsPlayerInTurnGuard()
+  @IsPlayerMasterGuard()
   restartGame(@Param('roomId') roomId: string) {
     this.logger.log('restart-game ' + roomId)
     const room = this.gameService.getRoomById(roomId);
     room.restartGame();
     const roomDto = roomEntityToDto(room);
     this.gameGateway.restartGame(roomDto);
-    return roomDto;
-  }
-
-  @Put('rooms/:roomId/init-game')
-  @IsPlayerInTurnGuard()
-  initGame(@Param('roomId') roomId: string) {
-    this.logger.log('init-game ' + roomId)
-    const room = this.gameService.getRoomById(roomId);
-    const roomDto = roomEntityToDto(room);
-    this.gameGateway.initGame(roomDto);
     return roomDto;
   }
 
