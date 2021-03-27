@@ -67,21 +67,16 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
     this.server.to(roomId).emit('update-player', createOkResp(player));
   }
 
+  updateMaster(roomId: string, newMaster: string) {
+    console.log('new-master', roomId, newMaster);
+    this.server.to(roomId).emit('new-master', createOkResp(newMaster))
+  }
+
   handleConnection(client: Socket): any {
     const userId = client.handshake.query.id;
     console.log('connection', userId);
     this.socketUserMap.set(client.id, userId);
     this.userIdToClientMap.set(userId, client);
-    const returningPlayer = this.gameService.getReturningPlayer(userId);
-    if (returningPlayer) {
-      const room = this.gameService.getRoomById(returningPlayer.roomId);
-      this.gameService.addRemovedPlayer(returningPlayer);
-      this.join(returningPlayer.roomId, returningPlayer.player);
-      if (returningPlayer.wasMaster && room.round === returningPlayer.round) {
-        this.gameService.updateMaster(room.id, returningPlayer.player.id);
-        this.updateMaster(room.id, returningPlayer.player.id);
-      }
-    }
   }
 
   handleDisconnect(client: Socket): any {
@@ -97,10 +92,5 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
         this.newTurn(room.id, room.updateNextTurn());
       }
     }
-  }
-
-  private updateMaster(roomId: string, newMaster: string) {
-    console.log('new-master', roomId, newMaster);
-    this.server.to(roomId).emit('new-master', createOkResp(newMaster))
   }
 }

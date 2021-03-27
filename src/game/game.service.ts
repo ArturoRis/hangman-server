@@ -1,14 +1,17 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { PlayerLeaving, PlayerRemoved, RoomEntity, Status } from './game.models';
+import Timeout = NodeJS.Timeout;
 
 @Injectable()
 export class GameService {
+  private static EMPTY_ROOM_TIMEOUT = 60 * 60 * 10; // 10 minutes;
   private roomsMap: Map<string, RoomEntity> = new Map();
   private userToRoomMap: Map<string, RoomEntity> = new Map();
   private removedPlayersMap: Map<string, PlayerRemoved> = new Map();
+  // roomId, timeoutId map
+  private emptyRoomMap: Map<string, Timeout> = new Map();
 
-  constructor() {
-  }
+  constructor() {}
 
   createRoom(userId: string, userName: string): RoomEntity {
     if (this.userToRoomMap.has(userId)) {
@@ -25,6 +28,12 @@ export class GameService {
   addPlayer(roomId: string, userId: string, userName: string, points: number = 0) {
     const room = this.getRoomById(roomId);
     this.userToRoomMap.set(userId, room);
+
+    const wasEmpty = this.emptyRoomMap.has(roomId);
+    if (wasEmpty) {
+      clearTimeout(this.emptyRoomMap.get(roomId));
+    }
+
     return room.addPlayer(userId, userName, points);
   }
 
@@ -48,14 +57,19 @@ export class GameService {
     }
 
     if (!room.players.length) {
-      this.roomsMap.delete(roomId);
-
-      Array.from(this.removedPlayersMap.entries())
-        .filter( ([_, { roomId: rId }]) => roomId === rId)
-        .forEach( ([key]) => this.removedPlayersMap.delete(key));
+      const timeoutId = setTimeout(() => this.removeRoom(roomId), GameService.EMPTY_ROOM_TIMEOUT);
+      this.emptyRoomMap.set(roomId, timeoutId);
     }
 
     return playerLeaving;
+  }
+
+  private removeRoom(roomId: string) {
+    this.roomsMap.delete(roomId);
+
+    Array.from(this.removedPlayersMap.entries())
+      .filter( ([_, { roomId: rId }]) => roomId === rId)
+      .forEach( ([key]) => this.removedPlayersMap.delete(key));
   }
 
   isPlayerInTurn(roomId: string, playerId: string): boolean {
@@ -83,10 +97,6 @@ export class GameService {
 
   checkGameFinished(roomId: string): Status {
     return this.getRoomById(roomId).isGameFinished();
-  }
-
-  addRemovedPlayer({player, roomId}: PlayerRemoved) {
-    this.addPlayer(roomId, player.id, player.name, player.points);
   }
 
   updateMaster(roomId: string, newMaster: string) {

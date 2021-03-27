@@ -56,9 +56,28 @@ export class GameController {
     @PlayerIdHeader() userId: string
     ): PlayerInfo {
     this.logger.log('controller-join ' + roomId + ', ' + userId + ', ' + name);
-    const player = this.gameService.addPlayer(roomId, userId, name);
+
+    const returningPlayer = this.gameService.getReturningPlayer(userId);
+    let points = 0;
+    if (returningPlayer?.roomId === roomId) {
+      points = returningPlayer.player.points;
+    }
+
+    const player = this.gameService.addPlayer(roomId, userId, name, points);
     this.gameGateway.join(roomId, player);
-    return player
+
+    const room = this.gameService.getRoomById(roomId);
+    if (returningPlayer?.wasMaster && room.round === returningPlayer.round) {
+      this.gameService.updateMaster(room.id, player.id);
+      this.gameGateway.updateMaster(room.id, player.id);
+
+      if (!room.currentWord.length) {
+        room.currentTurn = userId;
+        this.gameGateway.newTurn(roomId, userId);
+      }
+    }
+
+    return player;
   }
 
   @Delete('rooms/:roomId/players/:playerId')
