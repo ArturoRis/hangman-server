@@ -134,12 +134,12 @@ export class RoomEntity implements RoomDto{
   }
 
   addPlayer(userId: string, name: string, points: number): PlayerInfo {
-    let player: PlayerInfo;
-    // TODO is it possible to add an already present player?
-    player = this.players.find(p => p.id === userId);
+    let player = this.players.find(p => p.id === userId);
     if (!player) {
       player = { id: userId, name, points };
-      this.players.push(player);
+      this.players.unshift(player);
+    } else {
+      player.name = name;
     }
     return player;
   }
