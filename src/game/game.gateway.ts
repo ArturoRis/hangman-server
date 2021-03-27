@@ -23,7 +23,7 @@ export class GameGateway implements OnGatewayDisconnect<Socket>, OnGatewayConnec
 
   join(roomIdToJoin: string, player: PlayerInfo) {
     console.log('join-room', player);
-    this.userIdToClientMap.get(player.id).join(roomIdToJoin);
+    this.userIdToClientMap.get(player.id)?.join(roomIdToJoin);
     this.server.to(roomIdToJoin).emit('player-join', createOkResp(player));
   }
 
